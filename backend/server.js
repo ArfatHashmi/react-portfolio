@@ -309,27 +309,25 @@ app.post("/api/chat", async (req, res) => {
   }
 
   try {
-    const startTime = Date.now();
-
-    console.log("Gemini request started...");
+    const geminiStartTime = Date.now();
 
     const response = await ai.models.generateContent({
       model: "gemini-3.5-flash-lite",
-      contents: [
-        ...history,
-        {
-          role: "user",
-          parts: [{ text: message }],
-        },
-      ],
+      contents: [...history, { role: "user", parts: [{ text: message }] }],
       config: {
         systemInstruction: VISITOR_ASSISTANT_PROMPT,
         thinkingConfig: {
-          thinkingLevel: "LOW",
+          thinkingLevel: "minimal",
         },
         maxOutputTokens: 600,
       },
     });
+
+    console.log(
+      "GEMINI ONLY TIME:",
+      ((Date.now() - geminiStartTime) / 1000).toFixed(2),
+      "seconds",
+    );
 
     const reply = response.text || "Sorry, I couldn't generate a reply.";
 
@@ -378,7 +376,15 @@ app.post("/api/chat", async (req, res) => {
         lastAssistantMessage,
       );
 
+    const mongoStartTime = Date.now();
+
     const existingVisitor = await Visitor.findOne({ sessionId });
+
+    console.log(
+      "MONGODB FIND TIME:",
+      ((Date.now() - mongoStartTime) / 1000).toFixed(2),
+      "seconds",
+    );
 
     const updateFields = {};
 
@@ -390,6 +396,7 @@ app.post("/api/chat", async (req, res) => {
       updateFields.purpose = message.trim();
     }
 
+    const mongoUpdateStartTime = Date.now();
     // Save this turn to the same visitor's record.
     await Visitor.findOneAndUpdate(
       { sessionId },
@@ -423,12 +430,17 @@ app.post("/api/chat", async (req, res) => {
         setDefaultsOnInsert: true,
       },
     );
-    scheduleVisitorEmail(sessionId);
     console.log(
-      "Gemini response time:",
-      ((Date.now() - startTime) / 1000).toFixed(2),
+      "MONGODB UPDATE TIME:",
+      ((Date.now() - mongoUpdateStartTime) / 1000).toFixed(2),
       "seconds",
     );
+    scheduleVisitorEmail(sessionId);
+    // console.log(
+    //   "Gemini response time:",
+    //   ((Date.now() - startTime) / 1000).toFixed(2),
+    //   "seconds",
+    // );
 
     res.json({
       success: true,
