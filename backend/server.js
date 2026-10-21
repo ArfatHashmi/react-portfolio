@@ -312,12 +312,12 @@ app.post("/api/chat", async (req, res) => {
     const geminiStartTime = Date.now();
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.8-flash",
+      model: "gemini-3.1-flash-lite",
       contents: [...history, { role: "user", parts: [{ text: message }] }],
       config: {
         systemInstruction: VISITOR_ASSISTANT_PROMPT,
         thinkingConfig: {
-          thinkingLevel: "low",
+          thinkingLevel: "minimal",
         },
         maxOutputTokens: 600,
       },
