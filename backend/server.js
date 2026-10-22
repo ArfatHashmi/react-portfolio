@@ -311,24 +311,47 @@ app.post("/api/chat", async (req, res) => {
   try {
     const geminiStartTime = Date.now();
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3.1-flash-lite",
-      contents: [...history, { role: "user", parts: [{ text: message }] }],
-      config: {
-        systemInstruction: VISITOR_ASSISTANT_PROMPT,
-        thinkingConfig: {
-          thinkingLevel: "minimal",
-        },
-        maxOutputTokens: 600,
+    const contents = [...history, { role: "user", parts: [{ text: message }] }];
+
+    const config = {
+      systemInstruction: VISITOR_ASSISTANT_PROMPT,
+      thinkingConfig: {
+        thinkingLevel: "minimal",
       },
-    });
+      maxOutputTokens: 600,
+    };
+
+    let response;
+
+    try {
+      response = await ai.models.generateContent({
+        model: "gemini-3.1-flash-lite",
+        contents,
+        config,
+      });
+    } catch (primaryError) {
+      const status = Number(primaryError.status);
+
+      if (![429, 500, 502, 503, 504].includes(status)) {
+        throw primaryError;
+      }
+
+      console.warn(
+        `Primary Gemini model failed with ${status}. Trying fallback model.`,
+      );
+
+      response = await ai.models.generateContent({
+        model: "gemini-3.5-flash-lite",
+        contents,
+        config,
+      });
+    }
 
     console.log(
-      "GEMINI ONLY TIME:",
+      "GEMINI TOTAL TIME:",
       ((Date.now() - geminiStartTime) / 1000).toFixed(2),
       "seconds",
     );
-
     const reply = response.text || "Sorry, I couldn't generate a reply.";
 
     console.log(
